@@ -38,14 +38,10 @@ export async function POST(req: NextRequest) {
   }
   const body = await req.json().catch(() => ({}));
   const projectId = body.projectId || process.env.BROWSERBASE_PROJECT_ID;
+
+  // No userMetadata — avoids "not a valid metadata value" errors
   const payload: Record<string, unknown> = {
     timeout: body.timeout || 300,
-    browserSettings: {
-      blockAds: true,
-      solveCaptchas: true,
-      recordSession: true,
-      logSession: true,
-    },
   };
   if (projectId) payload.projectId = projectId;
 

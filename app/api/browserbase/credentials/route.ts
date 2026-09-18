@@ -23,11 +23,18 @@ function serverBbKey() {
   ).trim();
 }
 
+/** Browserbase metadata values must be simple strings without issues — sanitize */
+function safeMetaValue(v: string) {
+  return String(v || "portal")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "_")
+    .slice(0, 64) || "portal";
+}
+
 export async function OPTIONS() {
   return new Response(null, { status: 204, headers: CORS });
 }
 
-/** Status of Vercel-connected Browserbase key (never returns raw secret) */
 export async function GET() {
   const key = serverBbKey();
   const projectId = (process.env.BROWSERBASE_PROJECT_ID || "").trim();
@@ -37,11 +44,10 @@ export async function GET() {
       success: false,
       connected: false,
       error: "BROWSERBASE_API_KEY not set on Vercel",
-      hint: "Vercel → Project Settings → Environment Variables → BROWSERBASE_API_KEY → Redeploy",
+      hint: "Vercel → Environment Variables → BROWSERBASE_API_KEY → Redeploy",
     });
   }
 
-  // Live validate against Browserbase
   try {
     const res = await fetch(`${BB}/sessions`, {
       headers: { "x-bb-api-key": key },
@@ -76,10 +82,6 @@ export async function GET() {
   }
 }
 
-/**
- * Create a working Browserbase session credential using Vercel env key.
- * Client receives session id + debugger URLs (callback) — not the master API key.
- */
 export async function POST(req: NextRequest) {
   const key = serverBbKey();
   if (!key) {
@@ -98,32 +100,66 @@ export async function POST(req: NextRequest) {
   }
 
   const projectId =
-    body.projectId || process.env.BROWSERBASE_PROJECT_ID || undefined;
+    (body.projectId || process.env.BROWSERBASE_PROJECT_ID || "").trim() || undefined;
+
+  const displayName = String(body.name || "portal-session").trim().slice(0, 80);
+
+  // Minimal valid body — avoid invalid userMetadata (Browserbase is strict)
+  const payload: Record<string, unknown> = {
+    timeout: Math.min(Math.max(Number(body.timeout) || 300, 60), 21600),
+  };
+  if (projectId) payload.projectId = projectId;
+
+  // Optional: only safe alphanumeric metadata if supported
+  payload.userMetadata = {
+    source: "mggems_portal",
+    label: safeMetaValue(displayName),
+  };
 
   try {
-    const createRes = await fetch(`${BB}/sessions`, {
+    let createRes = await fetch(`${BB}/sessions`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-bb-api-key": key,
       },
-      body: JSON.stringify({
-        ...(projectId ? { projectId } : {}),
-        timeout: body.timeout || 300,
-        browserSettings: {
-          blockAds: true,
-          solveCaptchas: true,
-          recordSession: true,
-          logSession: true,
-        },
-        userMetadata: {
-          name: body.name || "portal-credential",
-          via: "mggems-api-portal",
-        },
-      }),
+      body: JSON.stringify(payload),
     });
 
-    const session = await createRes.json().catch(() => ({}));
+    let session = await createRes.json().catch(() => ({}));
+
+    // Retry without userMetadata if metadata rejected
+    if (
+      !createRes.ok &&
+      String(session?.message || session?.error || "").toLowerCase().includes("metadata")
+    ) {
+      const { userMetadata: _drop, ...clean } = payload;
+      createRes = await fetch(`${BB}/sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-bb-api-key": key,
+        },
+        body: JSON.stringify(clean),
+      });
+      session = await createRes.json().catch(() => ({}));
+    }
+
+    // Retry bare minimum
+    if (!createRes.ok) {
+      const minimal: Record<string, unknown> = { timeout: 300 };
+      if (projectId) minimal.projectId = projectId;
+      createRes = await fetch(`${BB}/sessions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-bb-api-key": key,
+        },
+        body: JSON.stringify(minimal),
+      });
+      session = await createRes.json().catch(() => ({}));
+    }
+
     if (!createRes.ok) {
       return json({
         success: false,
@@ -147,7 +183,6 @@ export async function POST(req: NextRequest) {
       /* */
     }
 
-    // Client-facing credential (session-scoped — master BB key stays on server)
     const credential = {
       type: "browserbase_session",
       session_id: session.id,
@@ -162,20 +197,19 @@ export async function POST(req: NextRequest) {
         `https://www.browserbase.com/sessions/${session.id}`,
       dashboard: `https://www.browserbase.com/sessions/${session.id}`,
       created_via: "vercel_BROWSERBASE_API_KEY",
-      name: body.name || "portal-credential",
+      name: displayName,
     };
 
     return json({
       success: true,
       message: "Working Browserbase session credential created",
       credential,
-      // Explicit server → client callback payload
       callback: {
         type: "browserbase_credential",
         status: "ok",
         session_id: session.id,
-        client_should: "open debuggerUrl or use connectUrl with Playwright/Puppeteer",
-        note: "Master API key remains on Vercel only — never sent to browser",
+        client_should: "open debuggerUrl or use connectUrl with Playwright",
+        note: "Master API key stays on Vercel only",
       },
       curl: {
         list: `curl -s https://api.browserbase.com/v1/sessions -H "x-bb-api-key: $BROWSERBASE_API_KEY"`,
