@@ -2,8 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'MGGEMS API Portal | Developer Keys & Docs',
-  description: 'API Key generation, documentation and client for Mahatma Gandhi Government English Medium School, Lalchandpura, Jaipur',
+  title: 'MGGEMS API Portal | Developer Keys & Live Data',
+  description:
+    'API Key generation, live school data (notices, admissions, attendance, users) for Mahatma Gandhi Government English Medium School',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,8 +24,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <a href="/">Home</a>
               <a href="/keys">Generate Key</a>
               <a href="/docs">API Docs</a>
-              <a href="/client">Try API</a>
-              <a href="https://school-website-peach-zeta-psi.vercel.app" target="_blank" rel="noreferrer" className="btn-outline">School Site</a>
+              <a href="/client">Live Data</a>
+              <a
+                href="https://school-website-peach-zeta-psi.vercel.app"
+                target="_blank"
+                rel="noreferrer"
+                className="btn-outline"
+              >
+                School Site
+              </a>
             </nav>
           </div>
         </header>
