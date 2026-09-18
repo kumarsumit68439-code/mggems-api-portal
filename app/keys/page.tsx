@@ -3,11 +3,14 @@
 import { useState, useEffect } from 'react';
 
 const API_BASE = 'https://school-website-peach-zeta-psi.vercel.app';
+const SCHOOL = API_BASE;
 
 interface StoredKey {
   name: string;
   key: string;
   email?: string;
+  keyId?: string;
+  prefix?: string;
   createdAt: string;
 }
 
@@ -41,27 +44,32 @@ export default function KeysPage() {
       const res = await fetch(`${API_BASE}/api/v1/keys/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), email: email.trim() || undefined }),
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim() || undefined,
+          owner_name: name.trim(),
+        }),
       });
 
       const data = await res.json().catch(() => ({}));
 
-      if (!res.ok) {
-        throw new Error(data.message || data.error || `HTTP ${res.status}`);
+      if (!res.ok || data.success === false) {
+        throw new Error(data.error || data.message || `HTTP ${res.status}`);
       }
 
-      // Support common response shapes
       const keyValue =
-        data.key ||
         data.api_key ||
+        data.key ||
         data.apiKey ||
         data.token ||
-        data.data?.key ||
         data.data?.api_key ||
+        data.data?.key ||
         '';
 
       if (!keyValue) {
-        throw new Error('Key create succeeded but no key returned. Check school API response.');
+        throw new Error(
+          'Key create response missing api_key. Raw: ' + JSON.stringify(data).slice(0, 200)
+        );
       }
 
       setNewKey(keyValue);
@@ -70,11 +78,16 @@ export default function KeysPage() {
         name: name.trim(),
         key: keyValue,
         email: email.trim() || undefined,
+        keyId: data.key_id || data.id,
+        prefix: data.prefix || keyValue.slice(0, 12),
         createdAt: new Date().toISOString(),
       };
       saveKeys([entry, ...keys]);
     } catch (err: any) {
-      setError(err.message || 'Failed to create key. School API may be offline or require auth.');
+      setError(
+        err.message ||
+          'Failed to create key. Check school API is live and CORS allows this portal.'
+      );
     } finally {
       setLoading(false);
     }
@@ -85,8 +98,7 @@ export default function KeysPage() {
   }
 
   function removeKey(idx: number) {
-    const next = keys.filter((_, i) => i !== idx);
-    saveKeys(next);
+    saveKeys(keys.filter((_, i) => i !== idx));
   }
 
   return (
@@ -94,9 +106,17 @@ export default function KeysPage() {
       <h1 style={{ fontSize: '1.75rem', color: 'var(--primary)', marginBottom: '0.5rem' }}>
         🔑 Generate API Key
       </h1>
-      <p style={{ color: 'var(--muted)', marginBottom: '1.5rem' }}>
-        Create a Bearer token for the MGGEMS school API. Keys are created on the school backend
-        (Supabase + Firebase). Raw key is shown only once — copy it now.
+      <p style={{ color: 'var(--muted)', marginBottom: '1rem' }}>
+        Creates a key on the <strong>school backend</strong> (Supabase <code>api_keys</code>, SHA-256
+        hash). Raw key shown once.
+      </p>
+      <p style={{ fontSize: '0.9rem', marginBottom: '1.5rem' }}>
+        School site:{' '}
+        <a href={`${SCHOOL}/api-keys`} target="_blank" rel="noreferrer">
+          {SCHOOL}/api-keys
+        </a>{' '}
+        ·{' '}
+        <a href="/client">Test with Client →</a>
       </p>
 
       <div className="card">
@@ -123,17 +143,24 @@ export default function KeysPage() {
           </button>
         </form>
 
-        {error && <div className="alert alert-error" style={{ marginTop: '1rem' }}>{error}</div>}
+        {error && (
+          <div className="alert alert-error" style={{ marginTop: '1rem' }}>
+            {error}
+          </div>
+        )}
 
         {newKey && (
           <div style={{ marginTop: '1.25rem' }}>
             <div className="alert alert-success">
-              Key created successfully. Copy it now — it will not be shown again in full on the server.
+              Key created on school Supabase. Copy now — server stores only hash.
             </div>
             <div className="key-display">{newKey}</div>
             <button type="button" className="btn" onClick={() => copyKey(newKey)}>
               Copy Key
-            </button>
+            </button>{' '}
+            <a href="/client" className="btn btn-secondary">
+              Test in Client
+            </a>
           </div>
         )}
       </div>
@@ -141,7 +168,7 @@ export default function KeysPage() {
       <div className="card">
         <h2>Your keys (this browser)</h2>
         <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-          Stored only in your browser localStorage. Not synced to any server from this portal.
+          Browser localStorage only. Server has hashed copy for verification.
         </p>
         {keys.length === 0 && <p style={{ color: 'var(--muted)' }}>No keys yet.</p>}
         {keys.map((k, i) => (
@@ -154,17 +181,30 @@ export default function KeysPage() {
               marginBottom: '0.75rem',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '0.5rem',
+                flexWrap: 'wrap',
+              }}
+            >
               <strong>{k.name}</strong>
               <span style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
                 {new Date(k.createdAt).toLocaleString()}
               </span>
             </div>
             <div className="key-display" style={{ fontSize: '0.8rem', margin: '0.5rem 0' }}>
-              {k.key.slice(0, 12)}…{k.key.slice(-6)}
+              {(k.prefix || k.key.slice(0, 12))}…{k.key.slice(-6)}
             </div>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button type="button" className="btn" style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }} onClick={() => copyKey(k.key)}>
+              <button
+                type="button"
+                className="btn"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem' }}
+                onClick={() => copyKey(k.key)}
+              >
                 Copy full key
               </button>
               <button
@@ -181,7 +221,10 @@ export default function KeysPage() {
       </div>
 
       <p style={{ textAlign: 'center' }}>
-        <a href="/docs">→ Full API Documentation</a>
+        <a href="/docs">Docs</a> · <a href="/client">Client</a> ·{' '}
+        <a href={SCHOOL} target="_blank" rel="noreferrer">
+          School website
+        </a>
       </p>
     </div>
   );

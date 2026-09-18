@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 const API_BASE = 'https://school-website-peach-zeta-psi.vercel.app';
 
@@ -17,9 +17,19 @@ export default function ClientPage() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('mggems_api_keys');
+      if (raw) {
+        const list = JSON.parse(raw);
+        if (list[0]?.key) setApiKey(list[0].key);
+      }
+    } catch {}
+  }, []);
+
   async function call(path: string, method: string = 'GET') {
     if (!apiKey.trim()) {
-      setResult('Please enter an API key first.');
+      setResult('Please enter an API key first. Generate one on /keys');
       setStatus('error');
       return;
     }
@@ -35,7 +45,7 @@ export default function ClientPage() {
         },
       });
       const text = await res.text();
-      let body: any;
+      let body: unknown;
       try {
         body = JSON.parse(text);
       } catch {
@@ -44,7 +54,10 @@ export default function ClientPage() {
       setResult(JSON.stringify(body, null, 2));
       setStatus(res.ok ? 'success' : 'error');
     } catch (err: any) {
-      setResult(err.message || 'Request failed');
+      setResult(
+        (err.message || 'Request failed') +
+          '\n\nIf CORS error: school API must send Access-Control-Allow-Origin: *'
+      );
       setStatus('error');
     } finally {
       setLoading(false);
@@ -57,8 +70,7 @@ export default function ClientPage() {
         🔌 API Client
       </h1>
       <p style={{ color: 'var(--muted)', marginBottom: '1.5rem' }}>
-        Test school API endpoints from the browser using your Bearer token.
-        No student/staff login required — only API key.
+        Calls school API at <code>{API_BASE}</code> with Bearer token. No school login required.
       </p>
 
       <div className="card">
@@ -85,12 +97,23 @@ export default function ClientPage() {
           ))}
         </div>
         <p style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-          No key? <a href="/keys">Generate API Key</a> · <a href="/docs">Docs</a>
+          No key? <a href="/keys">Generate API Key</a> · <a href="/docs">Docs</a> ·{' '}
+          <a href={`${API_BASE}/api-docs`} target="_blank" rel="noreferrer">
+            School API Docs
+          </a>
         </p>
       </div>
 
       <div className="card">
-        <h2>Response {status === 'success' && <span className="badge">OK</span>}{status === 'error' && <span className="badge" style={{ background: '#fee2e2', color: '#991b1b' }}>Error</span>}</h2>
+        <h2>
+          Response{' '}
+          {status === 'success' && <span className="badge">OK</span>}
+          {status === 'error' && (
+            <span className="badge" style={{ background: '#fee2e2', color: '#991b1b' }}>
+              Error
+            </span>
+          )}
+        </h2>
         <div className="result-box">{result}</div>
       </div>
     </div>
