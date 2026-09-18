@@ -9,8 +9,11 @@ export default function BrowserbaseApiKeyPage() {
   const [masked, setMasked] = useState('');
   const [name, setName] = useState('My Browser Session');
   const [loading, setLoading] = useState(false);
+  const [apiKey, setApiKey] = useState('');
+  const [sessionId, setSessionId] = useState('');
   const [credential, setCredential] = useState<Record<string, unknown> | null>(null);
   const [callback, setCallback] = useState('');
+  const [verifyOut, setVerifyOut] = useState('');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -27,6 +30,8 @@ export default function BrowserbaseApiKeyPage() {
   async function generateCredential() {
     setLoading(true);
     setError('');
+    setApiKey('');
+    setSessionId('');
     setCredential(null);
     setCallback('');
     try {
@@ -41,8 +46,12 @@ export default function BrowserbaseApiKeyPage() {
         setError(data.error || data.hint || 'Failed');
         return;
       }
-      setCredential(data.credential);
+      const k = data.api_key || data.key || data.credential?.api_key || '';
+      setApiKey(k);
+      setSessionId(data.session_id || data.credential?.session_id || '');
+      setCredential(data.credential || data);
       setConnected(true);
+      if (k) localStorage.setItem('bbsess_api_key', k);
     } catch (e: any) {
       setError(e.message || 'Network error');
     } finally {
@@ -50,22 +59,41 @@ export default function BrowserbaseApiKeyPage() {
     }
   }
 
+  async function verifyKey() {
+    const k = apiKey || localStorage.getItem('bbsess_api_key') || '';
+    if (!k) {
+      setVerifyOut('No api key');
+      return;
+    }
+    const res = await fetch('/api/browserbase/credentials/verify', {
+      headers: { Authorization: `Bearer ${k}` },
+    });
+    setVerifyOut(JSON.stringify(await res.json(), null, 2));
+  }
+
+  async function loadSession() {
+    const k = apiKey || localStorage.getItem('bbsess_api_key') || '';
+    if (!k) {
+      setVerifyOut('No api key');
+      return;
+    }
+    const res = await fetch('/api/browserbase/credentials/session', {
+      headers: { Authorization: `Bearer ${k}` },
+    });
+    setVerifyOut(JSON.stringify(await res.json(), null, 2));
+  }
+
   return (
     <div className="container" style={{ paddingTop: '2rem', paddingBottom: '2.5rem' }}>
       <div style={{ marginBottom: '0.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
         <Link href="/browserbase">Browserbase</Link> / API Key
       </div>
-      <h1 style={{ fontSize: '1.75rem', color: 'var(--primary)', marginBottom: '0.35rem' }}>
-        API Keys
-      </h1>
+      <h1 style={{ fontSize: '1.75rem', color: 'var(--primary)' }}>API Keys</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '1.5rem', maxWidth: 640 }}>
-        Browserbase-style credentials. Master key lives in{' '}
-        <strong>Vercel Environment Variables</strong> (<code>BROWSERBASE_API_KEY</code>). Server calls
-        real Browserbase endpoints and returns a <strong>session credential</strong> to the client
-        (callback) — master key never leaves the server.
+        Generate <strong>session id + browser-style API key</strong> (<code>bbsess_…</code>). Master key stays on
+        Vercel. Client gets key once via server callback.
       </p>
 
-      {/* Connection status */}
       <div
         className="card"
         style={{
@@ -73,41 +101,19 @@ export default function BrowserbaseApiKeyPage() {
           background: connected ? '#f0fdf4' : '#fffbeb',
         }}
       >
-        <h2 style={{ marginBottom: '0.5rem' }}>
-          {connected ? '✓ Connected to Browserbase' : '○ Vercel key status'}
-        </h2>
-        <p style={{ fontSize: '0.9rem', marginBottom: '0.5rem' }}>{statusMsg}</p>
+        <h2>{connected ? '✓ Browserbase connected' : '○ Vercel key'}</h2>
+        <p style={{ fontSize: '0.9rem' }}>{statusMsg}</p>
         {masked && (
-          <p style={{ fontFamily: 'ui-monospace, monospace', fontSize: '0.9rem' }}>
-            Key: {masked}
-          </p>
-        )}
-        {!connected && (
-          <ol style={{ fontSize: '0.85rem', marginTop: '0.75rem', paddingLeft: '1.25rem' }}>
-            <li>Vercel → mggems-api-portal → Settings → Environment Variables</li>
-            <li>
-              Name: <code>BROWSERBASE_API_KEY</code> · Value: key from{' '}
-              <a href="https://www.browserbase.com/settings" target="_blank" rel="noreferrer">
-                browserbase.com/settings
-              </a>
-            </li>
-            <li>Optional: <code>BROWSERBASE_PROJECT_ID</code></li>
-            <li>Production + Preview → Save → <strong>Redeploy</strong></li>
-          </ol>
+          <p style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>Master (masked): {masked}</p>
         )}
       </div>
 
-      {/* Generate */}
       <div className="card">
-        <h2>Generate session credential</h2>
-        <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1rem' }}>
-          Server uses Vercel key → <code>POST https://api.browserbase.com/v1/sessions</code> → client
-          gets session id + live debugger URLs (working access).
-        </p>
-        <label>Credential name</label>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="My Browser Session" />
+        <h2>Generate session + API key</h2>
+        <label>Name (label only)</label>
+        <input value={name} onChange={(e) => setName(e.target.value)} />
         <button type="button" className="btn" disabled={loading} onClick={generateCredential}>
-          {loading ? 'Creating on Browserbase…' : 'Generate working credential'}
+          {loading ? 'Creating…' : 'Generate session + API key'}
         </button>
         {error && (
           <div className="alert alert-error" style={{ marginTop: '1rem' }}>
@@ -115,71 +121,61 @@ export default function BrowserbaseApiKeyPage() {
           </div>
         )}
 
-        {credential && (
+        {apiKey && (
           <div style={{ marginTop: '1.25rem' }}>
-            <div className="alert alert-success">Credential created — copy session id / open debugger</div>
-            <div className="key-display">{String(credential.session_id)}</div>
-            <p style={{ fontSize: '0.85rem', marginBottom: '0.5rem' }}>
-              Status: {String(credential.status)} · Region: {String(credential.region)}
-            </p>
-            {credential.debuggerUrl ? (
-              <p>
-                <a href={String(credential.debuggerUrl)} target="_blank" rel="noreferrer" className="btn">
-                  Open live browser
-                </a>{' '}
-                <a
-                  href={String(credential.dashboard)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="btn btn-secondary"
-                >
-                  Dashboard
+            <div className="alert alert-success">
+              Copy API key now — use as Bearer token with verify / session endpoints
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>Session ID</p>
+            <div className="key-display" style={{ fontSize: '0.85rem' }}>
+              {sessionId}
+            </div>
+            <p style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>API Key (bbsess_…)</p>
+            <div className="key-display">{apiKey}</div>
+            <button type="button" className="btn" onClick={() => navigator.clipboard.writeText(apiKey)}>
+              Copy API key
+            </button>{' '}
+            <button type="button" className="btn btn-secondary" onClick={verifyKey}>
+              Verify key
+            </button>{' '}
+            <button type="button" className="btn btn-secondary" onClick={loadSession}>
+              Load session
+            </button>
+            {credential?.debuggerUrl ? (
+              <p style={{ marginTop: '0.75rem' }}>
+                <a href={String(credential.debuggerUrl)} target="_blank" rel="noreferrer">
+                  Open live browser →
                 </a>
               </p>
             ) : null}
-            <pre style={{ marginTop: '1rem', fontSize: '0.75rem' }}>
-              {JSON.stringify(credential, null, 2)}
-            </pre>
           </div>
         )}
       </div>
 
-      {/* Server callback */}
       <div className="card">
-        <h2>Server → client callback</h2>
-        <div className="result-box">{callback || 'Generate ke baad callback JSON yahan…'}</div>
+        <h2>Server callback</h2>
+        <div className="result-box">{callback || '…'}</div>
       </div>
 
-      {/* Endpoints & curl */}
       <div className="card">
-        <h2>Browserbase endpoints & commands</h2>
-        <pre>{`# Status (portal — uses Vercel key)
-curl -s https://mggems-api-portal.vercel.app/api/browserbase/credentials
+        <h2>Verify / session response</h2>
+        <div className="result-box">{verifyOut || 'Verify or Load session dabao…'}</div>
+      </div>
 
-# Generate session credential (server callback)
+      <div className="card">
+        <h2>Endpoints</h2>
+        <pre>{`# Create session + API key
 curl -s -X POST https://mggems-api-portal.vercel.app/api/browserbase/credentials \\
-  -H "Content-Type: application/json" \\
-  -d '{"name":"agent-session"}'
+  -H "Content-Type: application/json" -d '{"name":"agent"}'
 
-# Direct Browserbase (key only on server / your shell)
-curl -s https://api.browserbase.com/v1/sessions \\
-  -H "x-bb-api-key: $BROWSERBASE_API_KEY"
+# Verify API key
+curl -s https://mggems-api-portal.vercel.app/api/browserbase/credentials/verify \\
+  -H "Authorization: Bearer bbsess_YOUR_KEY"
 
-curl -s -X POST https://api.browserbase.com/v1/sessions \\
-  -H "Content-Type: application/json" \\
-  -H "x-bb-api-key: $BROWSERBASE_API_KEY" \\
-  -d '{}'
-
-# School data (separate mggems key from /keys)
-curl -s https://school-website-peach-zeta-psi.vercel.app/api/v1/auth/verify \\
-  -H "Authorization: Bearer mggems_YOUR_KEY"`}</pre>
+# Resolve session (debugger etc.)
+curl -s https://mggems-api-portal.vercel.app/api/browserbase/credentials/session \\
+  -H "Authorization: Bearer bbsess_YOUR_KEY"`}</pre>
       </div>
-
-      <p style={{ fontSize: '0.9rem' }}>
-        <Link href="/browserbase/sessions">Sessions</Link> ·{' '}
-        <Link href="/browserbase/docs">Agent setup docs</Link> ·{' '}
-        <Link href="/keys">School API key (mggems)</Link>
-      </p>
     </div>
   );
 }
