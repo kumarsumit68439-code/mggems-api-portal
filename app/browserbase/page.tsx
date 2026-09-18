@@ -1,7 +1,11 @@
 import Link from 'next/link';
 
 const links = [
-  { href: '/browserbase/api-key', title: 'API Key', desc: 'Validate Browserbase key · server callback' },
+  {
+    href: '/browserbase/api-key',
+    title: 'API Key',
+    desc: 'Vercel BROWSERBASE_API_KEY · generate session credential · server callback',
+  },
   { href: '/browserbase/sessions', title: 'Sessions', desc: 'List & create cloud browser sessions' },
   { href: '/browserbase/fetch', title: 'Fetch', desc: 'Server-side URL / school API test' },
   { href: '/browserbase/search', title: 'Search', desc: 'School in-site search proxy' },
@@ -14,12 +18,25 @@ export default function BrowserbaseHub() {
     <div className="container" style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
       <h1 style={{ fontSize: '1.75rem', color: 'var(--primary)' }}>Browserbase · Portal Hub</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '1.5rem' }}>
-        Production-style pages inspired by{' '}
+        Connect with Vercel env key · real{' '}
         <a href="https://www.browserbase.com" target="_blank" rel="noreferrer">
-          browserbase.com
-        </a>
-        . Real API calls when key is set. School data via MGGEMS Bearer token.
+          Browserbase
+        </a>{' '}
+        sessions · school data via MGGEMS Bearer.
       </p>
+
+      <div className="card" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
+        <h2>Start here</h2>
+        <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
+          1. Vercel pe <code>BROWSERBASE_API_KEY</code> add karo → Redeploy
+          <br />
+          2.{' '}
+          <Link href="/browserbase/api-key">API Key page</Link> pe connection check + Generate credential
+        </p>
+        <Link href="/browserbase/api-key" className="btn">
+          Open API Key page →
+        </Link>
+      </div>
 
       <div className="grid grid-2">
         {links.map((l) => (
@@ -31,22 +48,6 @@ export default function BrowserbaseHub() {
             </Link>
           </div>
         ))}
-      </div>
-
-      <div className="card">
-        <h2>Quick access</h2>
-        <ul style={{ fontSize: '0.9rem', paddingLeft: '1.2rem' }}>
-          <li>Monitor / Overview → this hub</li>
-          <li>Sessions / Contexts → Sessions page</li>
-          <li>Fetch / Search / Playground → dedicated pages</li>
-          <li>API key / Setup for agents → API Key + Docs</li>
-        </ul>
-        <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
-          School site:{' '}
-          <a href="https://school-website-peach-zeta-psi.vercel.app/browserbase" target="_blank" rel="noreferrer">
-            /browserbase
-          </a>
-        </p>
       </div>
     </div>
   );
