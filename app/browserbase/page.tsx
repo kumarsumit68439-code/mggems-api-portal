@@ -4,13 +4,17 @@ const links = [
   {
     href: '/browserbase/api-key',
     title: 'API Key',
-    desc: 'Vercel BROWSERBASE_API_KEY · generate session credential · server callback',
+    desc: 'Session + bbsess_ API key · server callback',
   },
-  { href: '/browserbase/sessions', title: 'Sessions', desc: 'List & create cloud browser sessions' },
+  {
+    href: '/browserbase/playground',
+    title: 'Playground',
+    desc: 'Endpoints · server call · client callback',
+  },
+  { href: '/browserbase/sessions', title: 'Sessions', desc: 'List & create cloud sessions' },
   { href: '/browserbase/fetch', title: 'Fetch', desc: 'Server-side URL / school API test' },
-  { href: '/browserbase/search', title: 'Search', desc: 'School in-site search proxy' },
-  { href: '/browserbase/playground', title: 'Playground', desc: 'Try Bearer + school data' },
-  { href: '/browserbase/docs', title: 'Setup / Docs', desc: 'curl · React · Python · FastAPI · Flask' },
+  { href: '/browserbase/search', title: 'Search', desc: 'School search proxy' },
+  { href: '/browserbase/docs', title: 'Setup / Docs', desc: 'curl · React · Python · FastAPI' },
 ];
 
 export default function BrowserbaseHub() {
@@ -18,23 +22,17 @@ export default function BrowserbaseHub() {
     <div className="container" style={{ paddingTop: '2rem', paddingBottom: '2rem' }}>
       <h1 style={{ fontSize: '1.75rem', color: 'var(--primary)' }}>Browserbase · Portal Hub</h1>
       <p style={{ color: 'var(--muted)', marginBottom: '1.5rem' }}>
-        Connect with Vercel env key · real{' '}
-        <a href="https://www.browserbase.com" target="_blank" rel="noreferrer">
-          Browserbase
-        </a>{' '}
-        sessions · school data via MGGEMS Bearer.
+        Vercel env key · real sessions · school data · playground with callbacks
       </p>
 
       <div className="card" style={{ background: '#eff6ff', borderColor: '#bfdbfe' }}>
-        <h2>Start here</h2>
+        <h2>Quick</h2>
         <p style={{ fontSize: '0.9rem', marginBottom: '0.75rem' }}>
-          1. Vercel pe <code>BROWSERBASE_API_KEY</code> add karo → Redeploy
-          <br />
-          2.{' '}
-          <Link href="/browserbase/api-key">API Key page</Link> pe connection check + Generate credential
+          <Link href="/browserbase/api-key">API Key</Link> → generate · then{' '}
+          <Link href="/browserbase/playground">Playground</Link> → test endpoints
         </p>
-        <Link href="/browserbase/api-key" className="btn">
-          Open API Key page →
+        <Link href="/browserbase/playground" className="btn">
+          Open Playground →
         </Link>
       </div>
 
