@@ -21,7 +21,16 @@ export async function OPTIONS() {
 }
 
 async function proxy(req: NextRequest, pathParts: string[]) {
-  const path = pathParts.join("/");
+  const parts = (pathParts || []).filter(Boolean);
+  if (parts.length === 0) {
+    return json({
+      success: true,
+      message: "Use /api/v1 for index or /api/v1/notices etc.",
+      hint: "GET /api/v1",
+    });
+  }
+
+  const path = parts.join("/");
   const search = req.nextUrl.search || "";
   const target = `${SCHOOL}/api/v1/${path}${search}`;
 
@@ -41,7 +50,7 @@ async function proxy(req: NextRequest, pathParts: string[]) {
     try {
       init.body = await req.text();
     } catch {
-      /* empty body */
+      /* empty */
     }
   }
 
@@ -55,7 +64,6 @@ async function proxy(req: NextRequest, pathParts: string[]) {
       body = { success: false, error: "Non-JSON from school", raw: text.slice(0, 500) };
     }
 
-    // Annotate proxy source when object
     if (body && typeof body === "object" && !Array.isArray(body)) {
       (body as Record<string, unknown>)._proxy = {
         via: "mggems-api-portal",
@@ -65,45 +73,27 @@ async function proxy(req: NextRequest, pathParts: string[]) {
 
     return json(body, res.status);
   } catch (e) {
-    return json(
-      {
-        success: false,
-        error: "Proxy failed: " + String(e),
-        school: target,
-      },
-      502
-    );
+    return json({ success: false, error: "Proxy failed: " + String(e), school: target }, 502);
   }
 }
 
-export async function GET(
-  req: NextRequest,
-  ctx: { params: Promise<{ path: string[] }> | { path: string[] } }
-) {
+async function getPath(ctx: { params: Promise<{ path: string[] }> | { path: string[] } }) {
   const params = await Promise.resolve(ctx.params);
-  return proxy(req, params.path || []);
+  return params.path || [];
 }
 
-export async function POST(
-  req: NextRequest,
-  ctx: { params: Promise<{ path: string[] }> | { path: string[] } }
-) {
-  const params = await Promise.resolve(ctx.params);
-  return proxy(req, params.path || []);
+export async function GET(req: NextRequest, ctx: { params: Promise<{ path: string[] }> | { path: string[] } }) {
+  return proxy(req, await getPath(ctx));
 }
 
-export async function PUT(
-  req: NextRequest,
-  ctx: { params: Promise<{ path: string[] }> | { path: string[] } }
-) {
-  const params = await Promise.resolve(ctx.params);
-  return proxy(req, params.path || []);
+export async function POST(req: NextRequest, ctx: { params: Promise<{ path: string[] }> | { path: string[] } }) {
+  return proxy(req, await getPath(ctx));
 }
 
-export async function DELETE(
-  req: NextRequest,
-  ctx: { params: Promise<{ path: string[] }> | { path: string[] } }
-) {
-  const params = await Promise.resolve(ctx.params);
-  return proxy(req, params.path || []);
+export async function PUT(req: NextRequest, ctx: { params: Promise<{ path: string[] }> | { path: string[] } }) {
+  return proxy(req, await getPath(ctx));
+}
+
+export async function DELETE(req: NextRequest, ctx: { params: Promise<{ path: string[] }> | { path: string[] } }) {
+  return proxy(req, await getPath(ctx));
 }
